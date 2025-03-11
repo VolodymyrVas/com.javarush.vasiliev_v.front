@@ -1,11 +1,304 @@
-<html>
+<!DOCTYPE html>
+<html lang="ru">
 <head>
-    <title>RPG</title>
-    <script src=https://code.jquery.com/jquery-3.6.0.min.js></script>
+    <meta charset="UTF-8">
+    <title>RPG Admin Panel</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link href="/css/my.css" rel="stylesheet">
 </head>
 <body>
-<h1>RPG admin panel</h1>
+<h1>RPG Admin Panel</h1>
+<h4>Accounts list:</h4>
+<div>
+    <label>Count per page:</label>
+    <select id="pageSizeSelect">
+        <option value="3">3</option>
+        <option value="5" selected>5</option>
+        <option value="10">10</option>
+        <option value="20">20</option>
+    </select>
+</div>
 
+<table id="playersTable" border="1">
+    <thead>
+    <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Title</th>
+        <th>Race</th>
+        <th>Profession</th>
+        <th>Level</th>
+        <th>Birthday</th>
+        <th>Banned</th>
+        <th>Edit</th>
+        <th>Delete</th>
+    </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+
+<div id="pagination"></div>
+<hr> <!-- Горизонтальная линия -->
+
+<h3>Create new account:</h3>
+<div id="create-form">
+    <label>Name (1-12):</label>
+    <input type="text" id="newName" maxlength="12" required><br>
+
+    <label>Title (1-30):</label>
+    <input type="text" id="newTitle" maxlength="30"><br>
+
+    <label>Race:</label>
+    <select id="newRace">
+        <option value="HUMAN">HUMAN</option>
+        <option value="DWARF">DWARF</option>
+        <option value="ELF">ELF</option>
+        <option value="ORC">ORC</option>
+        <option value="TROLL">TROLL</option>
+    </select><br>
+
+    <label>Profession:</label>
+    <select id="newProfession">
+        <option value="WARRIOR">WARRIOR</option>
+        <option value="ROGUE">ROGUE</option>
+        <option value="SORCERER">SORCERER</option>
+        <option value="CLERIC">CLERIC</option>
+        <option value="PALADIN">PALADIN</option>
+        <option value="NAZGUL">NAZGUL</option>
+        <option value="WARLOCK">WARLOCK</option>
+        <option value="DRUID">DRUID</option>
+    </select><br>
+
+    <label>Level (0-100):</label>
+    <input type="number" id="newLevel" min="0" max="100"><br>
+
+    <label>Birthday:</label>
+    <input type="date" id="newBirthday"><br>
+
+    <label>Banned:</label>
+    <input type="checkbox" id="newBanned"><br><br>
+
+    <button onclick="createPlayer()">SAVE</button>
+</div>
+
+<script>
+let totalPlayers = 0;
+let currentPage = 0;
+let pageSize = 5;
+
+async function getTotalPlayers() {
+    const response = await fetch("/rest/players/count");
+    totalPlayers = await response.json();
+    createPagination();
+}
+
+async function getPlayers(pageNumber, pageSize) {
+    const response = await fetch(`/rest/players?pageNumber=${pageNumber}&pageSize=${pageSize}`);
+    const players = await response.json();
+    const tableBody = document.querySelector("#playersTable tbody");
+    tableBody.innerHTML = "";
+
+    players.forEach(player => {
+        const row = tableBody.insertRow();
+
+        const idCell = row.insertCell(0);
+        const nameCell = row.insertCell(1);
+        const titleCell = row.insertCell(2);
+        const raceCell = row.insertCell(3);
+        const professionCell = row.insertCell(4);
+        const levelCell = row.insertCell(5);
+        const birthdayCell = row.insertCell(6);
+        const bannedCell = row.insertCell(7);
+        const editCell = row.insertCell(8);
+        const deleteCell = row.insertCell(9);
+
+        idCell.textContent = player.id;
+        nameCell.textContent = player.name;
+        titleCell.textContent = player.title;
+        raceCell.textContent = player.race;
+        professionCell.textContent = player.profession;
+        levelCell.textContent = player.level;
+
+        const birthday = new Date(player.birthday);
+        birthdayCell.textContent = `${birthday.getDate().toString().padStart(2, '0')}.${(birthday.getMonth() + 1).toString().padStart(2, '0')}.${birthday.getFullYear()}`;
+
+        bannedCell.textContent = player.banned;
+
+        const editIcon = document.createElement("img");
+        editIcon.src = "/img/edit.png";
+        editIcon.style.cursor = "pointer";
+        editCell.appendChild(editIcon);
+
+        const deleteIcon = document.createElement("img");
+        deleteIcon.src = "/img/delete.png";
+        deleteIcon.style.cursor = "pointer";
+        deleteCell.appendChild(deleteIcon);
+
+        let isEditing = false;
+
+        editIcon.onclick = () => {
+            if (!isEditing) {
+                isEditing = true;
+                editIcon.src = "/img/save.png";
+
+                nameCell.innerHTML = `<input type="text" value="${player.name}">`;
+                titleCell.innerHTML = `<input type="text" value="${player.title}">`;
+
+                raceCell.innerHTML = `
+                    <select>
+                        <option value="HUMAN" ${player.race === "HUMAN" ? "selected" : ""}>HUMAN</option>
+                        <option value="DWARF" ${player.race === "DWARF" ? "selected" : ""}>DWARF</option>
+                        <option value="ELF" ${player.race === "ELF" ? "selected" : ""}>ELF</option>
+                        <option value="ORC" ${player.race === "ORC" ? "selected" : ""}>ORC</option>
+                        <option value="TROLL" ${player.race === "TROLL" ? "selected" : ""}>TROLL</option>
+                    </select>`;
+
+                professionCell.innerHTML = `
+                    <select>
+                        <option value="WARRIOR" ${player.profession === "WARRIOR" ? "selected" : ""}>WARRIOR</option>
+                        <option value="ROGUE" ${player.profession === "ROGUE" ? "selected" : ""}>ROGUE</option>
+                        <option value="SORCERER" ${player.profession === "SORCERER" ? "selected" : ""}>SORCERER</option>
+                        <option value="CLERIC" ${player.profession === "CLERIC" ? "selected" : ""}>CLERIC</option>
+                        <option value="PALADIN" ${player.profession === "PALADIN" ? "selected" : ""}>PALADIN</option>
+                        <option value="NAZGUL" ${player.profession === "NAZGUL" ? "selected" : ""}>NAZGUL</option>
+                        <option value="WARLOCK" ${player.profession === "WARLOCK" ? "selected" : ""}>WARLOCK</option>
+                        <option value="DRUID" ${player.profession === "DRUID" ? "selected" : ""}>DRUID</option>
+                    </select>`;
+
+                bannedCell.innerHTML = `<input type="checkbox" ${player.banned ? "checked" : ""}>`;
+            } else {
+                isEditing = false;
+                editIcon.src = "/img/edit.png";
+
+                const updatedPlayer = {
+                    name: nameCell.querySelector("input").value,
+                    title: titleCell.querySelector("input").value,
+                    race: raceCell.querySelector("select").value,
+                    profession: professionCell.querySelector("select").value,
+                    banned: bannedCell.querySelector("input").checked
+                };
+
+                updatePlayer(player.id, updatedPlayer);
+            }
+        };
+
+        deleteIcon.onclick = async () => {
+            if (confirm(`Удалить игрока: ${player.name}?`)) {
+                await deletePlayer(player.id);
+                await getTotalPlayers();
+                getPlayers(currentPage, pageSize);
+            }
+        };
+    });
+}
+
+async function updatePlayer(id, data) {
+    const response = await fetch(`/rest/players/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+    });
+    if (response.ok) {
+        console.log("Игрок обновлён");
+        getPlayers(currentPage, pageSize); // Обновляем таблицу
+    } else {
+        alert("Ошибка при обновлении");
+    }
+}
+
+async function deletePlayer(id) {
+    const response = await fetch(`/rest/players/${id}`, { method: "DELETE" });
+    if (response.ok) console.log(`Игрок с ID ${id} удалён`);
+    else alert("Не удалось удалить");
+}
+
+function createPagination() {
+    const pagination = document.getElementById("pagination");
+    pagination.innerHTML = "";
+    const pageCount = Math.ceil(totalPlayers / pageSize);
+    for (let i = 0; i < pageCount; i++) {
+        const btn = document.createElement("button");
+        btn.textContent = i + 1;
+        btn.className = i === currentPage ? "active" : "";
+        btn.disabled = i === currentPage;
+        btn.onclick = () => { currentPage = i; getPlayers(currentPage, pageSize); createPagination(); };
+        pagination.appendChild(btn);
+    }
+}
+
+async function createPlayer() {
+    const name = document.getElementById("newName").value.trim();
+    const title = document.getElementById("newTitle").value.trim();
+    const race = document.getElementById("newRace").value;
+    const profession = document.getElementById("newProfession").value;
+    const level = parseInt(document.getElementById("newLevel").value);
+    const birthday = document.getElementById("newBirthday").value;
+    const banned = document.getElementById("newBanned").checked;
+
+    // Валидация:
+    if (name.length < 1 || name.length > 12) {
+        alert("Имя должно содержать от 1 до 12 символов.");
+        return;
+    }
+    if (title.length > 30) {
+        alert("Титул не должен превышать 30 символов.");
+        return;
+    }
+    if (isNaN(level) || level < 0 || level > 100) {
+        alert("Уровень должен быть от 0 до 100.");
+        return;
+    }
+    if (!birthday) {
+        alert("Выберите дату рождения.");
+        return;
+    }
+
+    const newPlayer = {
+        name,
+        title,
+        race,
+        profession,
+        level,
+        birthday: new Date(birthday).getTime(), // Преобразуем в timestamp
+        banned
+    };
+
+    console.log("Создаём игрока:", newPlayer); // Для отладки
+
+    try {
+        const response = await fetch("/rest/players", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(newPlayer)
+        });
+
+        if (response.ok) {
+            alert("Игрок успешно создан!");
+            // После создания обновляем таблицу и общее количество
+            await getTotalPlayers();
+            await getPlayers(currentPage, pageSize);
+            // Очищаем форму:
+            document.getElementById("create-form").reset();
+        } else {
+            alert("Ошибка при создании игрока.");
+        }
+    } catch (error) {
+        console.error("Ошибка создания:", error);
+        alert("Произошла ошибка при создании.");
+    }
+}
+
+document.getElementById("pageSizeSelect").onchange = function () {
+    pageSize = +this.value;
+    currentPage = 0;
+    getPlayers(currentPage, pageSize);
+    createPagination();
+};
+
+window.onload = async () => {
+    await getTotalPlayers();
+    getPlayers(currentPage, pageSize);
+};
+</script>
 </body>
 </html>
